@@ -25,7 +25,9 @@ async function buildPkceParams(config: AuthConfig): Promise<URLSearchParams> {
   storeCodeVerifier(codeVerifier);
 
   return new URLSearchParams({
-    scope: config.scopes ?? 'trade account_manage',
+    // 'trade' only: a request for a scope the app is not registered with is
+    // rejected outright (error=invalid_scope), so the fallback stays minimal.
+    scope: config.scopes ?? 'trade',
     response_type: 'code',
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
