@@ -119,15 +119,14 @@ export class PortfolioAnalysisService {
         let peak = 0;
         let equity = 0;
         let maxDrawdown = 0;
-        let peakEquity = 0;
 
         for (const profit of profits) {
             equity += profit;
-            if (equity > peak) { peak = equity; peakEquity = peak; }
+            if (equity > peak) peak = equity;
             const drawdown = peak - equity;
             if (drawdown > maxDrawdown) maxDrawdown = drawdown;
         }
-        const maxDrawdownPercent = peakEquity !== 0 ? (maxDrawdown / peakEquity) * 100 : 0;
+        const maxDrawdownPercent = peak !== 0 ? (maxDrawdown / peak) * 100 : 0;
 
         // Value at Risk (historical simulation)
         const sorted = [...profits].sort((a, b) => a - b);

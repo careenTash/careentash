@@ -124,37 +124,49 @@ export class FinancialMetricsService {
 
         let equity = 0;
         let peak = 0;
-        let peakEquity = 0;
         let maxDrawdown = 0;
         let drawdownStart = 0;
         let longestDrawdownMs = 0;
+        let inDrawdown = false;
         const drawdowns: number[] = [];
 
         for (const trade of sorted) {
             equity += trade.profit;
             if (equity > peak) {
+                // Equity has recovered to a new peak — end any active drawdown period
+                if (inDrawdown) {
+                    const duration = trade.exitTime - drawdownStart;
+                    if (duration > longestDrawdownMs) longestDrawdownMs = duration;
+                    inDrawdown = false;
+                }
                 peak = equity;
-                peakEquity = peak;
-                drawdownStart = trade.exitTime;
             }
             const drawdown = peak - equity;
-            if (drawdown > 0) drawdowns.push(drawdown);
-            if (drawdown > maxDrawdown) {
-                maxDrawdown = drawdown;
-                longestDrawdownMs = trade.exitTime - drawdownStart;
+            if (drawdown > 0) {
+                drawdowns.push(drawdown);
+                if (!inDrawdown) {
+                    // Start tracking a new drawdown period from the last peak
+                    drawdownStart = trade.exitTime;
+                    inDrawdown = true;
+                }
             }
+            if (drawdown > maxDrawdown) maxDrawdown = drawdown;
         }
 
-        const maxDrawdownPercent = peakEquity !== 0 ? (maxDrawdown / peakEquity) * 100 : 0;
+        // Close any drawdown still open at the end of the series
+        if (inDrawdown && sorted.length > 0) {
+            const duration = sorted[sorted.length - 1].exitTime - drawdownStart;
+            if (duration > longestDrawdownMs) longestDrawdownMs = duration;
+        }
+
+        const maxDrawdownPercent = peak !== 0 ? (maxDrawdown / peak) * 100 : 0;
         const averageDrawdown = drawdowns.length > 0 ? drawdowns.reduce((s, d) => s + d, 0) / drawdowns.length : 0;
         const longestDrawdownPeriodDays = longestDrawdownMs / (1000 * 60 * 60 * 24);
 
-        const currentEquity = sorted.reduce((s, t) => s + t.profit, 0);
-        const currentPeak = Math.max(peak, currentEquity);
-        const currentDrawdown = Math.max(0, currentPeak - currentEquity);
-        const currentDrawdownPercent = currentPeak !== 0 ? (currentDrawdown / currentPeak) * 100 : 0;
+        const currentDrawdown = Math.max(0, peak - equity);
+        const currentDrawdownPercent = peak !== 0 ? (currentDrawdown / peak) * 100 : 0;
 
-        const totalProfit = sorted.reduce((s, t) => s + t.profit, 0);
+        const totalProfit = equity; // equity is already the running sum of all profits
         const recoveryFactor = maxDrawdown !== 0 ? totalProfit / maxDrawdown : 0;
 
         return {
